@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Rádio</title>
+<style>
+  :root{
+    --bg-0:#050506;
+    --bg-1:#0b0b0c;
+    --hub:#111113;
+    --node:rgba(20,20,22,0.72);
+    --node-border:rgba(255,255,255,0.14);
+    --node-hover:rgba(40,40,42,0.85);
+    --node-active-border:rgba(255,255,255,0.9);
+    --accent-red:#b3261e;
+    --text-hi:#f2f2f0;
+    --text-lo:rgba(230,230,225,0.55);
+    --text-faint:rgba(230,230,225,0.32);
+    --divider:rgba(255,255,255,0.08);
+    --player-bg:rgba(10,10,11,0.82);
+    --player-border:rgba(255,255,255,0.10);
+    --panel-bg:#0c0c0d;
+    --panel-border:rgba(255,255,255,0.10);
+    --field-bg:#151517;
+    --youtube-red:#e0645c;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;width:100%;
+    background:var(--bg-0);
+    overflow:hidden;
+    font-family:"Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .view{display:none;}
+  .view.active{display:flex;}
+
+  /* ================= RADIO VIEW ================= */
+
+  #radioView{
+    position:relative;
+    width:100vw;height:100vh;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    background:
+      radial-gradient(ellipse at 50% 42%, #1c1c1e 0%, #0e0e10 46%, #050506 78%, #020203 100%);
+  }
+
+  #radioView::before{
+    content:"";
+    position:absolute;inset:0;
+    background:radial-gradient(circle at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%);
+    pointer-events:none;
+  }
+
+  .wheel-stage{
+    position:relative;
+    width:min(78vmin, 620px);
+    height:min(78vmin, 620px);
+    flex-shrink:0;
+  }
+
+  .wheel-orbit{
+    position:absolute;
+    inset:0;
+    border-radius:50%;
+    border:1px solid var(--divider);
+  }
+
+  .hub{
+    position:absolute;
+    top:50%;left:50%;
+    width:34%;
+    height:34%;
+    transform:translate(-50%,-50%);
+    border-radius:50%;
+    background:radial-gradient(circle at 50% 40%, var(--hub) 0%, #08080a 100%);
+    border:1px solid var(--divider);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:6%;
+  }
+
+  .hub-inner{display:flex;flex-direction:column;gap:6px;max-width:100%;}
+
+  .hub-station{
+    font-size:clamp(11px, 1.6vmin, 15px);
+    letter-spacing:0.03em;
+    color:var(--text-hi);
+    font-weight:600;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+
+  .hub-track{
+    font-size:clamp(9px, 1.2vmin, 12px);
+    color:var(--text-lo);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;
+  }
+
+  .hub-hint{font-size:clamp(8px, 1vmin, 10px);color:var(--text-faint);letter-spacing:0.04em;}
+
+  .station-node{
+    position:absolute;
+    width:15.5%;height:15.5%;
+    top:50%;left:50%;
+    border-radius:50%;
+    background:var(--node);
+    border:1px solid var(--node-border);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    transition:background 120ms ease, border-color 120ms ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  .station-node:hover{background:var(--node-hover);border-color:rgba(255,255,255,0.32);}
+  .station-node:focus-visible{outline:2px solid rgba(255,255,255,0.6);outline-offset:2px;}
+
+  .station-node.active{
+    background:rgba(30,30,32,0.92);
+    border-color:var(--node-active-border);
+    box-shadow:0 0 0 1px rgba(255,255,255,0.06);
+  }
+  .station-node.active .station-mark{color:var(--text-hi);}
+  .station-node.active::after{
+    content:"";position:absolute;inset:-6px;border-radius:50%;
+    border:1px solid rgba(255,255,255,0.18);
+  }
+
+  .station-mark{
+    font-size:clamp(10px, 1.5vmin, 14px);
+    font-weight:700;letter-spacing:0.02em;color:var(--text-lo);
+    pointer-events:none;user-select:none;
+  }
+
+  .station-label{
+    position:absolute;top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    font-size:clamp(9px, 1.05vmin, 11px);
+    color:var(--text-faint);
+    white-space:nowrap;pointer-events:none;opacity:0;
+    transition:opacity 120ms ease;letter-spacing:0.02em;
+  }
+
+  .station-node:hover .station-label, .station-node.active .station-label{
+    opacity:1;color:var(--text-lo);
+  }
+
+  .player{
+    margin-top:clamp(14px, 3vmin, 28px);
+    width:min(420px, 86vw);
+    background:var(--player-bg);
+    border:1px solid var(--player-border);
+    border-radius:10px;
+    padding:10px 14px;
+    display:flex;flex-direction:column;gap:8px;
+    backdrop-filter:blur(6px);
+    opacity:0;transform:translateY(6px);
+    transition:opacity 160ms ease, transform 160ms ease;
+    pointer-events:none;
+  }
+
+  .player.visible{opacity:1;transform:translateY(0);pointer-events:auto;}
+
+  .player-top{display:flex;align-items:center;gap:12px;}
+
+  .player-cover{
+    width:42px;height:42px;border-radius:5px;
+    background:linear-gradient(135deg, #2a2a2c, #131314);
+    border:1px solid var(--divider);
+    flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    font-size:10px;color:var(--text-faint);overflow:hidden;
+  }
+  .player-cover img{width:100%;height:100%;object-fit:cover;display:block;}
+
+  .player-meta{flex:1;min-width:0;}
+  .player-title{font-size:13px;color:var(--text-hi);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .player-sub{font-size:11px;color:var(--text-lo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+  .player-playpause{
+    width:32px;height:32px;border-radius:50%;
+    border:1px solid var(--node-border);
+    background:rgba(255,255,255,0.04);color:var(--text-hi);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;flex-shrink:0;
+  }
+  .player-playpause:hover{background:rgba(255,255,255,0.10);}
+
+  .player-bottom{display:flex;align-items:center;gap:10px;}
+
+  .progress-track, .volume-track{
+    -webkit-appearance:none;appearance:none;
+    height:3px;background:rgba(255,255,255,0.15);
+    border-radius:2px;outline:none;cursor:pointer;
+  }
+  .progress-track{flex:1;}
+  .volume-track{width:64px;}
+
+  .progress-track::-webkit-slider-thumb, .volume-track::-webkit-slider-thumb{
+    -webkit-appearance:none;width:9px;height:9px;border-radius:50%;
+    background:var(--text-hi);margin-top:-3px;
+  }
+  .progress-track::-moz-range-thumb, .volume-track::-moz-range-thumb{
+    width:9px;height:9px;border:none;border-radius:50%;background:var(--text-hi);
+  }
+
+  .player-status{font-size:9px;color:var(--text-faint);letter-spacing:0.02em;}
+
+  .admin-entry{
+    position:absolute;
+    bottom:14px;right:16px;
+    font-size:10px;
+    letter-spacing:0.04em;
+    color:var(--text-faint);
+    background:none;border:none;
+    cursor:pointer;
+    padding:6px;
+    z-index:5;
+  }
+  .admin-entry:hover{color:var(--text-lo);}
+
+  /* ================= LOGIN VIEW ================= */
+
+  #loginView{
+    width:100vw;height:100vh;
+    align-items:center;justify-content:center;
+    background:#020203;
+  }
+
+  .login-box{
+    width:min(320px, 86vw);
+    background:var(--panel-bg);
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    padding:28px 24px;
+    display:flex;flex-direction:column;gap:14px;
+  }
+
+  .login-title{
+    font-size:13px;
+    letter-spacing:0.04em;
+    color:var(--text-hi);
+    font-weight:600;
+    margin-bottom:4px;
+  }
+
+  .field-label{font-size:11px;color:var(--text-lo);margin-bottom:5px;display:block;}
+
+  .field-input{
+    width:100%;
+    background:var(--field-bg);
+    border:1px solid var(--panel-border);
+    border-radius:6px;
+    color:var(--text-hi);
+    font-size:13px;
+    padding:8px 10px;
+    outline:none;
+  }
+  .field-input:focus{border-color:rgba(255,255,255,0.35);}
+
+  .btn{
+    border:1px solid var(--panel-border);
+    background:rgba(255,255,255,0.05);
+    color:var(--text-hi);
+    font-size:12px;
+    padding:9px 14px;
+    border-radius:6px;
+    cursor:pointer;
+    letter-spacing:0.02em;
+  }
+  .btn:hover{background:rgba(255,255,255,0.10);}
+  .btn-primary{background:rgba(179,38,30,0.16);border-color:rgba(179,38,30,0.4);}
+  .btn-primary:hover{background:rgba(179,38,30,0.26);}
+  .btn-ghost{background:none;}
+
+  .login-error{font-size:11px;color:#e0645c;min-height:14px;}
+
+  .login-back{align-self:flex-start;font-size:10px;color:var(--text-faint);background:none;border:none;cursor:pointer;}
+
+  /* ================= ADMIN VIEW ================= */
+
+  #adminView{
+    width:100vw;height:100vh;
+    flex-direction:column;
+    align-items:stretch;
+    background:#020203;
+    overflow-y:auto;
+  }
+
+  .admin-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:20px 24px;
+    border-bottom:1px solid var(--panel-border);
+    flex-wrap:wrap;gap:10px;
+  }
+
+  .admin-title{font-size:14px;color:var(--text-hi);font-weight:600;letter-spacing:0.02em;}
+
+  .admin-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+  .admin-body{padding:20px 24px 60px;max-width:760px;margin:0 auto;width:100%;}
+
+  .admin-subtitle{font-size:12px;color:var(--text-hi);font-weight:600;letter-spacing:0.02em;margin-bottom:10px;}
+
+  .integration-panel{
+    border:1px solid var(--panel-border);
+    border-radius:8px;
+    padding:16px;
+    margin-bottom:26px;
+    background:var(--field-bg);
+    display:flex;flex-direction:column;gap:10px;
+  }
+
+  .integration-hint{font-size:10.5px;color:var(--text-faint);line-height:1.5;}
+  .integration-status{font-size:11px;color:var(--text-lo);}
+  .integration-status.connected{color:var(--youtube-red);}
+  .integration-row-btns{display:flex;gap:8px;flex-wrap:wrap;}
+
+  .station-row{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 14px;
+    border:1px solid var(--panel-border);
+    border-radius:8px;
+    margin-bottom:8px;
+    background:var(--field-bg);
+  }
+
+  .station-row-name{font-size:13px;color:var(--text-hi);}
+  .station-row-count{font-size:11px;color:var(--text-faint);}
+
+  .track-item{
+    display:flex;align-items:center;gap:10px;
+    padding:6px 0 6px 20px;
+    border-bottom:1px solid rgba(255,255,255,0.05);
+  }
+  .track-item:last-child{border-bottom:none;}
+  .track-cover-mini{
+    width:26px;height:26px;border-radius:4px;overflow:hidden;flex-shrink:0;
+    background:#1b1b1d;display:flex;align-items:center;justify-content:center;
+    font-size:8px;color:var(--text-faint);
+  }
+  .track-cover-mini img{width:100%;height:100%;object-fit:cover;}
+  .track-item-meta{flex:1;min-width:0;}
+  .track-item-title{font-size:12px;color:var(--text-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .track-item-artist{font-size:10.5px;color:var(--text-lo);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .track-delete{
+    background:none;border:none;color:var(--text-faint);cursor:pointer;font-size:14px;
+    padding:2px 6px;line-height:1;
+  }
+  .track-delete:hover{color:#e0645c;}
+
+  .empty-hint{font-size:11px;color:var(--text-faint);padding:8px 0 8px 20px;}
+
+  /* ---------- Modal ---------- */
+
+  .modal-overlay{
+    position:fixed;inset:0;
+    background:rgba(0,0,0,0.65);
+    display:none;
+    align-items:center;justify-content:center;
+    z-index:50;
+  }
+  .modal-overlay.active{display:flex;}
+
+  .modal-box{
+    width:min(380px, 90vw);
+    max-height:86vh;
+    overflow-y:auto;
+    background:var(--panel-bg);
+    border:1px solid var(--panel-border);
+    border-radius:10px;
+    padding:22px;
+    display:flex;flex-direction:column;gap:12px;
+  }
+
+  .modal-title{font-size:13px;color:var(--text-hi);font-weight:600;margin-bottom:2px;}
+
+  .field-group{display:flex;flex-direction:column;}
+
+  select.field-input{appearance:none;}
+
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px;}
+
+  .modal-error{font-size:11px;color:#e0645c;min-height:14px;}
+
+  @media (max-width:520px){
+    .wheel-stage{width:88vw;height:88vw;}
+    .player{width:92vw;}
+  }
+</style>
+</head>
+<body>
+
+<!-- Player oculto do YouTube (áudio apenas — tamanho 0, não aparece na tela) -->
+<div id="youtubePlayer" style="position:absolute;width:0;height:0;overflow:hidden;"></div>
+
+<!-- ================= RADIO VIEW ================= -->
+<div class="view active" id="radioView">
+  <div class="wheel-stage" id="wheelStage">
+    <div class="wheel-orbit"></div>
+    <div class="hub" id="hub">
+      <div class="hub-inner">
+        <div class="hub-station" id="hubStation">Selecione uma estação</div>
+        <div class="hub-track" id="hubTrack">&nbsp;</div>
+        <div class="hub-hint">use as setas + enter, ou toque</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="player" id="player">
+    <div class="player-top">
+      <div class="player-cover" id="playerCover">—</div>
+      <div class="player-meta">
+        <div class="player-title" id="playerTitle">—</div>
+        <div class="player-sub" id="playerSub">—</div>
+      </div>
+      <button class="player-playpause" id="playPauseBtn" aria-label="Play/Pause">
+        <svg id="playIcon" width="12" height="12" viewBox="0 0 12 12"><polygon points="1,0 11,6 1,12" fill="currentColor"/></svg>
+        <svg id="pauseIcon" width="12" height="12" viewBox="0 0 12 12" style="display:none;"><rect x="1" y="0" width="3.4" height="12" fill="currentColor"/><rect x="7.6" y="0" width="3.4" height="12" fill="currentColor"/></svg>
+      </button>
+    </div>
+    <div class="player-bottom">
+      <input type="range" class="progress-track" id="progressBar" min="0" max="100" value="0">
+      <input type="range" class="volume-track" id="volumeBar" min="0" max="100" value="70">
+    </div>
+    <div class="player-status" id="playerStatus">&nbsp;</div>
+  </div>
+
+  <button class="admin-entry" id="adminEntryBtn">admin</button>
+</div>
+
+<!-- ================= LOGIN VIEW ================= -->
+<div class="view" id="loginView">
+  <div class="login-box">
+    <div class="login-title">Painel administrativo</div>
+    <div class="field-group">
+      <label class="field-label" for="loginUser">Login</label>
+      <input class="field-input" type="text" id="loginUser" autocomplete="username">
+    </div>
+    <div class="field-group">
+      <label class="field-label" for="loginPass">Senha</label>
+      <input class="field-input" type="password" id="loginPass" autocomplete="current-password">
+    </div>
+    <div class="login-error" id="loginError">&nbsp;</div>
+    <button class="btn btn-primary" id="loginSubmitBtn">Entrar</button>
+    <button class="login-back" id="loginBackBtn">← voltar à rádio</button>
+  </div>
+</div>
+
+<!-- ================= ADMIN VIEW ================= -->
+<div class="view" id="adminView">
+  <div class="admin-header">
+    <div class="admin-title">Painel administrativo — músicas</div>
+    <div class="admin-actions">
+      <button class="btn btn-primary" id="openAddModalBtn">+ Adicionar música</button>
+      <button class="btn btn-ghost" id="backToRadioBtn">Voltar à rádio</button>
+      <button class="btn btn-ghost" id="logoutBtn">Sair</button>
+    </div>
+  </div>
+  <div class="admin-body">
+
+    <div class="integration-panel">
+      <div class="admin-subtitle">Integração com YouTube</div>
+      <div class="integration-hint">
+        As faixas pré-definidas de cada estação (as que já vêm no código, sem MP3 anexado)
+        tocam automaticamente pelo YouTube — o app busca o vídeo pelo nome da música +
+        artista e reproduz o áudio dele. Não é preciso conectar nenhuma conta: só uma
+        chave gratuita da YouTube Data API v3, criada no Google Cloud Console
+        (console.cloud.google.com → APIs e Serviços → Credenciais → Criar chave de API,
+        com a "YouTube Data API v3" ativada no projeto).
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="youtubeApiKeyInput">Chave da API do YouTube</label>
+        <input class="field-input" type="text" id="youtubeApiKeyInput" placeholder="Cole aqui sua chave da YouTube Data API v3">
+      </div>
+      <div class="integration-row-btns">
+        <button class="btn btn-primary" id="saveYoutubeKeyBtn">Salvar chave</button>
+        <button class="btn btn-ghost" id="clearYoutubeKeyBtn">Remover chave</button>
+      </div>
+      <div class="integration-status" id="youtubeStatus">chave não configurada</div>
+    </div>
+
+    <div id="stationList"></div>
+  </div>
+</div>
+
+<!-- ================= MODAL: add track ================= -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal-box">
+    <div class="modal-title">Adicionar música</div>
+
+    <div class="field-group">
+      <label class="field-label" for="fieldStation">Estação</label>
+      <select class="field-input" id="fieldStation"></select>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="fieldTitle">Nome da música</label>
+      <input class="field-input" type="text" id="fieldTitle" placeholder="Ex: Sweet Emotion">
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="fieldArtist">Artista</label>
+      <input class="field-input" type="text" id="fieldArtist" placeholder="Ex: Aerosmith">
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="fieldAudio">Arquivo MP3</label>
+      <input class="field-input" type="file" id="fieldAudio" accept="audio/mpeg,.mp3">
+    </div>
+
+    <div class="field-group">
+      <label class="field-label" for="fieldCover">Capa (imagem)</label>
+      <input class="field-input" type="file" id="fieldCover" accept="image/*">
+    </div>
+
+    <div class="modal-error" id="modalError">&nbsp;</div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cancelAddBtn">Cancelar</button>
+      <button class="btn btn-primary" id="saveAddBtn">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   StationData — dados das estações (nomes oficiais do GTA V)
+   Nenhum áudio/logo real está embutido por direitos autorais.
+   Faixas SEM MP3 anexado (as de exemplo abaixo) tocam via
+   YouTube (busca automática por nome + artista, sem precisar
+   conectar nenhuma conta). Faixas adicionadas pelo painel
+   admin com um MP3 continuam tocando localmente.
+   ========================================================= */
+const STATIONS = [
+  { slug:"lsrr",  name:"Los Santos Rock Radio", mark:"LSRR",
+    tracks:[
+      {title:"Sweet Emotion", artist:"Aerosmith"},
+      {title:"Nightrain", artist:"Guns N' Roses"}
+    ]},
+  { slug:"nsp",   name:"Non-Stop-Pop FM", mark:"NSP",
+    tracks:[
+      {title:"Wannabe", artist:"Spice Girls"},
+      {title:"Toxic", artist:"Britney Spears"}
+    ]},
+  { slug:"rls",   name:"Radio Los Santos", mark:"RLS",
+    tracks:[
+      {title:"Hold Up", artist:"Marion Bands feat. Nipsey Hussle"},
+      {title:"Big Rings", artist:"Drake & Future"}
+    ]},
+  { slug:"cx",    name:"Channel X", mark:"CX",
+    tracks:[
+      {title:"Nervous Breakdown", artist:"Black Flag"},
+      {title:"Institutionalized", artist:"Suicidal Tendencies"}
+    ]},
+  { slug:"wctr",  name:"WCTR (talk)", mark:"WCTR",
+    tracks:[
+      {title:"Fame or Shame", artist:"Programa de entrevistas"}
+    ]},
+  { slug:"blaine",name:"Blaine County Radio", mark:"BC",
+    tracks:[
+      {title:"Wanted Man", artist:"Ratt"},
+      {title:"Runnin' Down a Dream", artist:"Tom Petty"}
+    ]},
+  { slug:"wccr",  name:"West Coast Classics", mark:"WCC",
+    tracks:[
+      {title:"Nuthin' but a 'G' Thang", artist:"Dr. Dre feat. Snoop Dogg"},
+      {title:"Regulate", artist:"Warren G feat. Nate Dogg"}
+    ]},
+  { slug:"low91", name:"The Lowdown 91.1", mark:"LOW",
+    tracks:[
+      {title:"Sexual Healing", artist:"Marvin Gaye"},
+      {title:"Computer Love", artist:"Zapp"}
+    ]},
+  { slug:"rmp",   name:"Radio Mirror Park", mark:"RMP",
+    tracks:[
+      {title:"Please Don't Go", artist:"Joel Corry"},
+      {title:"Sarah", artist:"Twin Shadow"}
+    ]},
+  { slug:"space", name:"Space 103.2", mark:"SP",
+    tracks:[
+      {title:"Wild Winds", artist:"Deadmau5"},
+      {title:"Genesis", artist:"Justice"}
+    ]},
+  { slug:"vinewood", name:"Vinewood Boulevard Radio", mark:"VB",
+    tracks:[
+      {title:"Suffragette City", artist:"David Bowie"},
+      {title:"Hey Ya!", artist:"OutKast"}
+    ]},
+  { slug:"flylo", name:"FlyLo FM", mark:"FLY",
+    tracks:[
+      {title:"Zodiac Shit", artist:"Flying Lotus"},
+      {title:"Never Catch Me", artist:"Flying Lotus feat. Kendrick Lamar"}
+    ]},
+  { slug:"blueark", name:"Blue Ark", mark:"BA",
+    tracks:[
+      {title:"Kids", artist:"MGMT"},
+      {title:"Two Weeks", artist:"FKA twigs"}
+    ]},
+  { slug:"rebel", name:"Rebel Radio", mark:"RBL",
+    tracks:[
+      {title:"Ring of Fire", artist:"Johnny Cash"},
+      {title:"Runaway", artist:"Del Shannon"}
+    ]},
+  { slug:"soulwax", name:"Soulwax FM", mark:"SWX",
+    tracks:[
+      {title:"NY Excuse", artist:"Soulwax"},
+      {title:"E Talking", artist:"Soulwax"}
+    ]}
+];
+
+/* =========================================================
+   TrackStore — persistência local (IndexedDB) das músicas
+   adicionadas pelo painel administrativo.
+   ========================================================= */
+const TrackStore = (() => {
+  const DB_NAME = "gtaRadioAdmin";
+  const STORE = "customTracks";
+  let dbPromise = null;
+
+  function openDB(){
+    if(dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains(STORE)){
+          db.createObjectStore(STORE, { keyPath:"id", autoIncrement:true });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    return dbPromise;
+  }
+
+  async function addTrack(record){
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      const req = tx.objectStore(STORE).add(record);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function getAll(){
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readonly");
+      const req = tx.objectStore(STORE).getAll();
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function remove(id){
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      const req = tx.objectStore(STORE).delete(id);
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  return { addTrack, getAll, remove };
+})();
+
+/* =========================================================
+   AudioManager — reprodução local (HTML5 Audio) usada apenas
+   para faixas com MP3 anexado pelo painel admin.
+   ========================================================= */
+const AudioManager = (() => {
+  const el = new Audio();
+  el.preload = "none";
+  let currentTrackKey = null;
+  let onStateChange = () => {};
+
+  function play(track){
+    const key = track.audioUrl;
+    if(currentTrackKey !== key){
+      currentTrackKey = key;
+      el.src = track.audioUrl;
+    }
+    const p = el.play();
+    if(p && p.catch) p.catch(() => onStateChange({ error:true }));
+  }
+  function pause(){ el.pause(); }
+  function togglePlay(){ el.paused ? el.play().catch(()=>onStateChange({error:true})) : el.pause(); }
+  function setVolume(v){ el.volume = Math.max(0, Math.min(1, v)); }
+  function seekTo(fraction){ if(el.duration && isFinite(el.duration)) el.currentTime = fraction * el.duration; }
+  function subscribe(fn){ onStateChange = fn; }
+
+  el.addEventListener("timeupdate", () => onStateChange({ progress: el.duration ? el.currentTime/el.duration : 0 }));
+  el.addEventListener("play", () => onStateChange({ playing:true }));
+  el.addEventListener("pause", () => onStateChange({ playing:false }));
+  el.addEventListener("error", () => onStateChange({ error:true }));
+
+  return { play, pause, togglePlay, setVolume, seekTo, subscribe, get paused(){ return el.paused; } };
+})();
+
+/* =========================================================
+   YouTubeManager — busca (YouTube Data API v3, só chave, sem
+   login) + reprodução em segundo plano (YouTube IFrame API).
+   ========================================================= */
+const YouTubeManager = (() => {
+  const SEARCH_URL = "https://www.googleapis.com/youtube/v3/search";
+  let player = null;
+  let apiReady = false;
+  let progressTimer = null;
+  let onState = () => {};
+  let pendingVideoId = null;
+
+  function getApiKey(){ return localStorage.getItem("youtube_api_key") || ""; }
+  function saveApiKey(key){ localStorage.setItem("youtube_api_key", key); }
+  function clearApiKey(){ localStorage.removeItem("youtube_api_key"); }
+
+  function loadScript(){
+    if(document.getElementById("youtube-iframe-api")) return;
+    const tag = document.createElement("script");
+    tag.id = "youtube-iframe-api";
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+  }
+
+  window.onYouTubeIframeAPIReady = () => {
+    apiReady = true;
+    player = new YT.Player("youtubePlayer", {
+      height: "0", width: "0",
+      playerVars: { autoplay:0, controls:0, disablekb:1, modestbranding:1 },
+      events: {
+        onReady: () => {
+          if(pendingVideoId){
+            player.loadVideoById(pendingVideoId);
+            player.playVideo();
+            pendingVideoId = null;
+          }
+        },
+        onStateChange: (e) => {
+          const playing = e.data === YT.PlayerState.PLAYING;
+          onState({ playing });
+          playing ? startPolling() : stopPolling();
+        }
+      }
+    });
+  };
+
+  function startPolling(){
+    stopPolling();
+    progressTimer = setInterval(() => {
+      if(!player || !player.getDuration) return;
+      const duration = player.getDuration();
+      const current = player.getCurrentTime();
+      if(duration) onState({ progress: current / duration });
+    }, 500);
+  }
+  function stopPolling(){ if(progressTimer) clearInterval(progressTimer); }
+
+  async function searchVideo(title, artist){
+    const key = getApiKey();
+    if(!key) throw new Error("no_key");
+    const q = encodeURIComponent(`${title} ${artist} audio`);
+    const url = `${SEARCH_URL}?part=snippet&q=${q}&type=video&videoCategoryId=10&maxResults=1&key=${key}`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error("search_failed");
+    const data = await res.json();
+    return (data.items && data.items[0]) ? data.items[0] : null;
+  }
+
+  function playVideoId(videoId){
+    if(!apiReady || !player || !player.loadVideoById){
+      pendingVideoId = videoId;
+      return;
+    }
+    player.loadVideoById(videoId);
+    player.playVideo();
+  }
+
+  function pause(){ if(player && player.pauseVideo) player.pauseVideo(); }
+  function resume(){ if(player && player.playVideo) player.playVideo(); }
+  function seekFraction(fraction){
+    if(player && player.getDuration){
+      const d = player.getDuration();
+      if(d) player.seekTo(fraction * d, true);
+    }
+  }
+  function setVolume(v){ if(player && player.setVolume) player.setVolume(Math.round(v * 100)); }
+  function subscribe(fn){ onState = fn; }
+  function hasKey(){ return !!getApiKey(); }
+
+  loadScript();
+
+  return { getApiKey, saveApiKey, clearApiKey, searchVideo, playVideoId, pause, resume, seekFraction, setVolume, subscribe, hasKey };
+})();
+
+/* =========================================================
+   Load custom (admin-uploaded) tracks from IndexedDB
+   ========================================================= */
+async function loadCustomTracksIntoStations(){
+  const records = await TrackStore.getAll();
+  STATIONS.forEach(s => { s.tracks = s.tracks.filter(t => !t.isCustom); });
+  records.forEach(r => {
+    const station = STATIONS.find(s => s.slug === r.stationSlug);
+    if(!station) return;
+    station.tracks.push({
+      title:r.title, artist:r.artist, isCustom:true, id:r.id,
+      audioUrl:URL.createObjectURL(r.audioBlob),
+      coverUrl:r.coverBlob ? URL.createObjectURL(r.coverBlob) : null
+    });
+  });
+}
+
+/* =========================================================
+   RadioWheel — construção visual e interação
+   ========================================================= */
+const wheelStage = document.getElementById("wheelStage");
+const hubStationEl = document.getElementById("hubStation");
+const hubTrackEl = document.getElementById("hubTrack");
+
+const playerEl = document.getElementById("player");
+const playerCoverEl = document.getElementById("playerCover");
+const playerTitleEl = document.getElementById("playerTitle");
+const playerSubEl = document.getElementById("playerSub");
+const playPauseBtn = document.getElementById("playPauseBtn");
+const playIcon = document.getElementById("playIcon");
+const pauseIcon = document.getElementById("pauseIcon");
+const progressBar = document.getElementById("progressBar");
+const volumeBar = document.getElementById("volumeBar");
+const playerStatus = document.getElementById("playerStatus");
+
+let activeIndex = -1;
+let playbackMode = "local"; // "local" (MP3 anexado) | "youtube"
+let youtubePlaying = false;
+const nodeEls = [];
+
+function layoutRadius(){ return wheelStage.clientWidth * 0.365; }
+
+function positionNodes(){
+  const r = layoutRadius();
+  const total = STATIONS.length;
+  nodeEls.forEach((node, i) => {
+    const angle = (i / total) * Math.PI * 2 - Math.PI / 2;
+    node.style.transform = `translate(-50%, -50%) translate(${Math.cos(angle)*r}px, ${Math.sin(angle)*r}px)`;
+  });
+}
+
+function buildWheel(){
+  STATIONS.forEach((station, i) => {
+    const node = document.createElement("div");
+    node.className = "station-node";
+    node.tabIndex = 0;
+    node.setAttribute("role", "button");
+    node.setAttribute("aria-label", station.name);
+    node.innerHTML = `<span class="station-mark">${station.mark}</span><span class="station-label">${station.name}</span>`;
+    node.addEventListener("click", () => selectStation(i));
+    node.addEventListener("keydown", (e) => { if(e.key === "Enter") selectStation(i); });
+    wheelStage.appendChild(node);
+    nodeEls.push(node);
+  });
+  positionNodes();
+}
+
+async function selectStation(index, trackIndex = 0){
+  if(activeIndex >= 0) nodeEls[activeIndex].classList.remove("active");
+  activeIndex = index;
+  nodeEls[activeIndex].classList.add("active");
+  nodeEls[activeIndex].focus({ preventScroll:true });
+
+  const station = STATIONS[index];
+  const track = station.tracks[trackIndex] || station.tracks[0];
+
+  hubStationEl.textContent = station.name;
+  hubTrackEl.textContent = `${track.title} — ${track.artist}`;
+  playerTitleEl.textContent = track.title;
+  playerSubEl.textContent = `${track.artist} · ${station.name}`;
+  playerEl.classList.add("visible");
+  playerStatus.textContent = "";
+
+  if(track.isCustom){
+    // faixa com MP3 anexado pelo painel admin -> reprodução local
+    if(playbackMode === "youtube") YouTubeManager.pause();
+    playbackMode = "local";
+    playerCoverEl.innerHTML = track.coverUrl ? `<img src="${track.coverUrl}" alt="">` : station.mark;
+    AudioManager.play(track);
+    return;
+  }
+
+  // faixa pré-definida -> buscar e tocar via YouTube (sem precisar conectar conta)
+  AudioManager.pause();
+  playbackMode = "youtube";
+  playerCoverEl.innerHTML = station.mark;
+
+  if(!YouTubeManager.hasKey()){
+    playerStatus.textContent = "configure uma chave da API do YouTube no painel admin para tocar esta faixa";
+    return;
+  }
+
+  playerStatus.textContent = "buscando no YouTube...";
+  try{
+    const result = await YouTubeManager.searchVideo(track.title, track.artist);
+    if(!result){
+      playerStatus.textContent = "faixa não encontrada no YouTube";
+      return;
+    }
+    const thumb = result.snippet.thumbnails && (result.snippet.thumbnails.medium || result.snippet.thumbnails.default);
+    if(thumb) playerCoverEl.innerHTML = `<img src="${thumb.url}" alt="">`;
+    playerStatus.textContent = "";
+    YouTubeManager.playVideoId(result.id.videoId);
+  }catch(err){
+    playerStatus.textContent = "não foi possível buscar no YouTube (verifique a chave de API)";
+  }
+}
+
+playPauseBtn.addEventListener("click", () => {
+  if(playbackMode === "youtube"){
+    youtubePlaying ? YouTubeManager.pause() : YouTubeManager.resume();
+  } else {
+    AudioManager.togglePlay();
+  }
+});
+
+volumeBar.addEventListener("input", (e) => {
+  const v = e.target.value / 100;
+  AudioManager.setVolume(v);
+  YouTubeManager.setVolume(v);
+});
+AudioManager.setVolume(volumeBar.value / 100);
+
+progressBar.addEventListener("input", (e) => {
+  if(playbackMode === "youtube"){
+    YouTubeManager.seekFraction(e.target.value / 100);
+  } else {
+    AudioManager.seekTo(e.target.value / 100);
+  }
+});
+
+AudioManager.subscribe((state) => {
+  if(playbackMode !== "local") return;
+  if(state.playing !== undefined){
+    playIcon.style.display = state.playing ? "none" : "block";
+    pauseIcon.style.display = state.playing ? "block" : "none";
+  }
+  if(state.progress !== undefined && document.activeElement !== progressBar) progressBar.value = state.progress * 100;
+  if(state.error) playerStatus.textContent = "arquivo de áudio não encontrado";
+});
+
+YouTubeManager.subscribe((state) => {
+  if(playbackMode !== "youtube") return;
+  if(state.playing !== undefined){
+    youtubePlaying = state.playing;
+    playIcon.style.display = state.playing ? "none" : "block";
+    pauseIcon.style.display = state.playing ? "block" : "none";
+  }
+  if(state.progress !== undefined && document.activeElement !== progressBar){
+    progressBar.value = state.progress * 100;
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if(!document.getElementById("radioView").classList.contains("active")) return;
+  if(["ArrowRight","ArrowDown"].includes(e.key)){
+    e.preventDefault();
+    selectStation(activeIndex < 0 ? 0 : (activeIndex + 1) % STATIONS.length);
+  } else if(["ArrowLeft","ArrowUp"].includes(e.key)){
+    e.preventDefault();
+    selectStation(activeIndex < 0 ? 0 : (activeIndex - 1 + STATIONS.length) % STATIONS.length);
+  } else if(e.code === "Space"){
+    if(activeIndex >= 0){ e.preventDefault(); playPauseBtn.click(); }
+  }
+});
+
+window.addEventListener("resize", positionNodes);
+
+/* =========================================================
+   View router (radio / login / admin) + auth
+   ========================================================= */
+const ADMIN_USER = "rolamentos";
+const ADMIN_PASS = "gta5radio";
+
+const views = {
+  radio: document.getElementById("radioView"),
+  login: document.getElementById("loginView"),
+  admin: document.getElementById("adminView")
+};
+
+function showView(name){
+  Object.values(views).forEach(v => v.classList.remove("active"));
+  views[name].classList.add("active");
+  if(name === "admin"){ renderAdminList(); renderYoutubeStatus(); }
+}
+
+function isAuthed(){ return sessionStorage.getItem("gtaRadioAdminAuthed") === "1"; }
+
+document.getElementById("adminEntryBtn").addEventListener("click", () => showView(isAuthed() ? "admin" : "login"));
+document.getElementById("loginBackBtn").addEventListener("click", () => showView("radio"));
+document.getElementById("backToRadioBtn").addEventListener("click", () => showView("radio"));
+document.getElementById("logoutBtn").addEventListener("click", () => {
+  sessionStorage.removeItem("gtaRadioAdminAuthed");
+  showView("radio");
+});
+
+document.getElementById("loginSubmitBtn").addEventListener("click", attemptLogin);
+document.getElementById("loginPass").addEventListener("keydown", (e) => { if(e.key === "Enter") attemptLogin(); });
+
+function attemptLogin(){
+  const user = document.getElementById("loginUser").value.trim();
+  const pass = document.getElementById("loginPass").value;
+  const errorEl = document.getElementById("loginError");
+  if(user === ADMIN_USER && pass === ADMIN_PASS){
+    sessionStorage.setItem("gtaRadioAdminAuthed", "1");
+    errorEl.textContent = "";
+    document.getElementById("loginPass").value = "";
+    showView("admin");
+  } else {
+    errorEl.textContent = "login ou senha incorretos";
+  }
+}
+
+/* ---------- YouTube config UI ---------- */
+function renderYoutubeStatus(){
+  document.getElementById("youtubeApiKeyInput").value = YouTubeManager.getApiKey();
+  const statusEl = document.getElementById("youtubeStatus");
+  if(YouTubeManager.hasKey()){
+    statusEl.textContent = "chave configurada";
+    statusEl.classList.add("connected");
+  } else {
+    statusEl.textContent = "chave não configurada";
+    statusEl.classList.remove("connected");
+  }
+}
+
+document.getElementById("saveYoutubeKeyBtn").addEventListener("click", () => {
+  YouTubeManager.saveApiKey(document.getElementById("youtubeApiKeyInput").value.trim());
+  renderYoutubeStatus();
+});
+
+document.getElementById("clearYoutubeKeyBtn").addEventListener("click", () => {
+  YouTubeManager.clearApiKey();
+  document.getElementById("youtubeApiKeyInput").value = "";
+  renderYoutubeStatus();
+});
+
+/* ---------- Admin track list rendering ---------- */
+function renderAdminList(){
+  const container = document.getElementById("stationList");
+  container.innerHTML = "";
+  STATIONS.forEach(station => {
+    const customTracks = station.tracks.filter(t => t.isCustom);
+    const row = document.createElement("div");
+    row.innerHTML = `
+      <div class="station-row">
+        <span class="station-row-name">${station.name}</span>
+        <span class="station-row-count">${customTracks.length} música(s) com MP3 anexado</span>
+      </div>
+    `;
+    const list = document.createElement("div");
+    if(customTracks.length === 0){
+      list.innerHTML = `<div class="empty-hint">nenhuma música anexada — as faixas de exemplo tocam via YouTube</div>`;
+    } else {
+      customTracks.forEach(t => {
+        const item = document.createElement("div");
+        item.className = "track-item";
+        item.innerHTML = `
+          <div class="track-cover-mini">${t.coverUrl ? `<img src="${t.coverUrl}" alt="">` : ""}</div>
+          <div class="track-item-meta">
+            <div class="track-item-title">${t.title}</div>
+            <div class="track-item-artist">${t.artist}</div>
+          </div>
+          <button class="track-delete" title="Remover">✕</button>
+        `;
+        item.querySelector(".track-delete").addEventListener("click", async () => {
+          await TrackStore.remove(t.id);
+          await loadCustomTracksIntoStations();
+          renderAdminList();
+        });
+        list.appendChild(item);
+      });
+    }
+    container.appendChild(row);
+    container.appendChild(list);
+  });
+}
+
+/* ---------- Add-track modal ---------- */
+const addModal = document.getElementById("addModal");
+const fieldStation = document.getElementById("fieldStation");
+const fieldTitle = document.getElementById("fieldTitle");
+const fieldArtist = document.getElementById("fieldArtist");
+const fieldAudio = document.getElementById("fieldAudio");
+const fieldCover = document.getElementById("fieldCover");
+const modalError = document.getElementById("modalError");
+
+function populateStationSelect(){
+  fieldStation.innerHTML = STATIONS.map(s => `<option value="${s.slug}">${s.name}</option>`).join("");
+}
+
+function openAddModal(){
+  populateStationSelect();
+  fieldTitle.value = ""; fieldArtist.value = ""; fieldAudio.value = ""; fieldCover.value = "";
+  modalError.textContent = "";
+  addModal.classList.add("active");
+}
+function closeAddModal(){ addModal.classList.remove("active"); }
+
+document.getElementById("openAddModalBtn").addEventListener("click", openAddModal);
+document.getElementById("cancelAddBtn").addEventListener("click", closeAddModal);
+addModal.addEventListener("click", (e) => { if(e.target === addModal) closeAddModal(); });
+
+document.getElementById("saveAddBtn").addEventListener("click", async () => {
+  const stationSlug = fieldStation.value;
+  const title = fieldTitle.value.trim();
+  const artist = fieldArtist.value.trim();
+  const audioFile = fieldAudio.files[0];
+  const coverFile = fieldCover.files[0];
+
+  if(!stationSlug || !title || !artist || !audioFile){
+    modalError.textContent = "preencha estação, nome, artista e o arquivo MP3";
+    return;
+  }
+  if(!audioFile.type.includes("audio") && !audioFile.name.toLowerCase().endsWith(".mp3")){
+    modalError.textContent = "o arquivo de áudio precisa ser um MP3";
+    return;
+  }
+
+  await TrackStore.addTrack({ stationSlug, title, artist, audioBlob:audioFile, coverBlob:coverFile || null });
+  await loadCustomTracksIntoStations();
+  closeAddModal();
+  renderAdminList();
+});
+
+/* =========================================================
+   Boot
+   ========================================================= */
+buildWheel();
+loadCustomTracksIntoStations();
+</script>
+</body>
+</html>
